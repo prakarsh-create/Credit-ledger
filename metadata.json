@@ -1,0 +1,6 @@
+{
+  "name": "Lucknow Artisan Credit Ledger",
+  "description": "AI-powered alternative credit scoring system for Lucknow's Chikankari and Zardozi MSMEs, using alternative business data for secure loan assessments.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
