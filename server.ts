@@ -483,21 +483,44 @@ Do not return any other text, block code formatting, or markdown wrappers except
 // NEW FEATURE B: AI UNDERWRITING COOPERATIVE COUNSEL / ADVISOR
 // ==========================================
 app.post("/api/ai-counsel", async (req, res) => {
-  const { profile, userMessage } = req.body;
+  const { profile, userMessage, language } = req.body;
   const rawScore = calculateDeterministicScore(profile).overallScore;
+  const currentLang = language || "en";
 
   if (!aiClient) {
-    return res.json({
-      reply: `Regarding your query about upgrading **${profile.name}**'s credit standing:
+    let fallbackReply = "";
+    if (currentLang === "hi") {
+      fallbackReply = `आपकी कार्यशाला **${profile.name}** की क्रेडिट पात्रता बढ़ाने के संबंध में:
+      
+1. **डिजिटल लेनदेन दर्ज करें:** आपका वर्तमान नकद लेनदेन अनुपात **${Math.round(profile.transactionCashRatio*100)}%** है। यदि आप हजरतगंज और चौक के बुटीक ऑर्डर्स के लिए डिजिटल यूपीआई (UPI) भुगतान स्वीकार करते हैं, तो आपका इंटीग्रिटी स्कोर सुधरेगा जिससे स्कोर सीधे **+45 अंक** तक बढ़ सकता है!
+
+2. **ओडीओपी (ODOP) के तहत सामग्री समर्थन:** चूंकि आपका बफर रक्षा स्तर **${Math.round(profile.rawMaterialCostIncreaseBuffer*100)}%** है, कच्चे माल के महंगे होने पर आपके मुनाफे प्रभावित हो सकते हैं। हम चौक लखनऊ में **एक जिला एक उत्पाद (ODOP)** हब से रियायती दरों पर धागे और जरी थोक में खरीदने की सलाह देते हैं।
+
+3. **डिलीवरी की समयबद्धता:** आपकी डिलीवरी डिले रेट **${Math.round(profile.deliveryDelayRate*100)}%** है। भारतीय डाक या स्थानीय पार्सल सेवाओं के साथ अपनी डिलीवरी ट्रैक करने योग्य बनाने से बैंक जोखिम स्तर को काफी कम मानेंगे।
+
+क्या आप पीएम मुद्रा योजना के बारे में विस्तार से चर्चा करना चाहेंगे?`;
+    } else if (currentLang === "hinglish") {
+      fallbackReply = `Aapki workshop **${profile.name}** ki credit score badhane ke liye tips:
+      
+1. **Transactions Digitize karein:** Aapka cash ratio abhi **${Math.round(profile.transactionCashRatio*100)}%** hai. Isse kam karke UPI/GPay lene se ledger strong hoga aur core score **+45 points** jump hoga.
+
+2. **ODOP Se looms and thread pools:** Aapka raw material buffer buffer limit **${Math.round(profile.rawMaterialCostIncreaseBuffer*100)}%** hai, zari material rates badhne se profit pr asar padega. Chowk Lucknow ke **One District One Product (ODOP)** cooperative center se bulk threads lene se chhoot milegi.
+
+3. **Delivery On-time karein:** Delivery time badha kar updates track karne se financial rating acchi hogi aur traditional land collateral ke bina bank credit lines de payenge.
+
+Kya aap PM Mudra scheme me support chahte hain?`;
+    } else {
+      fallbackReply = `Regarding your query about upgrading **${profile.name}**'s credit standing:
       
 1. **Digitize transaction trace:** Your cash dependency stands at **${Math.round(profile.transactionCashRatio*100)}%**. Encouraging digital UPI options for local boutique orders on Hazratganj blocks will raise your integrity index score, uplifting your core Alternative Score by around **+45 points**!
 
-2. **Supply Chain Buffering under ODOP:** Since your cushion limit is **${Math.round(profile.rawMaterialCostIncreaseBuffer*105)}%**, you are vulnerable to zari and metallic cotton shortages. We recommend purchase linking through Lucknow's central **One District One Product (ODOP) common block** to grab subsidised looms.
+2. **Supply Chain Buffering under ODOP:** Since your cushion limit is **${Math.round(profile.rawMaterialCostIncreaseBuffer*100)}%**, you are vulnerable to zari and metallic cotton shortages. We recommend purchase linking through Lucknow's central **One District One Product (ODOP) common block** to grab subsidised looms.
 
 3. **Logistics Auditability:** Your delivery delay sits at **${Math.round(profile.deliveryDelayRate*100)}%**. Enrolling in India Post handloom delivery APIs provides an audited tracing log, directly mitigating risk scores with underwriter banks.
 
-Would you like more details on linking these metrics to a PM Mudra loan application?`
-    });
+Would you like more details on linking these metrics to a PM Mudra loan application?`;
+    }
+    return res.json({ reply: fallbackReply });
   }
 
   try {
@@ -518,6 +541,12 @@ Enquiry: "${userMessage}"
 Generate a short, elegant, helpful conversational response explaining specific alternate ledger indicators they should modify. 
 Reference Lucknow's historical handcraft centers (Chowk, Nakhas, Aminabad, Kakori blocks) with cultural richness and prestige.
 Break down advice into clear, readable sections. Do not exceed 3 small paragraphs. Focus strictly on empowering them to bypass traditional land collateral traps.
+
+CRITICAL: Respond in the language specified below:
+Target Language config: "${currentLang}"
+- If Target Language is "hi" or "hindi", write the response completely in warm, respectful, official Hindi language in Devanagari script.
+- If Target Language is "hinglish", write the response in warm, clear Hinglish (Hindi mixed with English, written using the Roman alphabet/English letters).
+- If Target Language is "en" or "english", write the response in warm, professional English.
 `;
 
     const response = await aiClient.models.generateContent({
@@ -534,7 +563,11 @@ Break down advice into clear, readable sections. Do not exceed 3 small paragraph
   } catch (error) {
     console.error("AI counseling session failed:", error);
     return res.json({
-      reply: "We suggest linking your UPI transaction ledger inside Aminabad banks to verify credit margins without land collateral assets."
+      reply: currentLang === "hi" 
+        ? "हम परंपरागत बंधक की बाधा को दूर करने के लिए अमीनाबाद कोऑपरेटिव बैंक में अपना डिजिटल यूपीआई बही-खाता प्रदर्शित करने की सलाह देते हैं।" 
+        : currentLang === "hinglish"
+          ? "Hum recommend karte hain ki bina land papers ke loan lene ke liye apna UPI ledger bank me share karein."
+          : "We suggest linking your UPI transaction ledger inside Aminabad banks to verify credit margins without land collateral assets."
     });
   }
 });

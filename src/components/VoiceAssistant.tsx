@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Mic, MicOff, Volume2, Sparkles, CheckCircle2, ChevronRight, CornerDownRight } from 'lucide-react';
+import { Mic, MicOff, Volume2, VolumeX, Sparkles, CheckCircle2, CornerDownRight, RefreshCw, MessageSquare } from 'lucide-react';
 import { Language, translations } from '../utils/translations';
 import { MSMEProfile } from '../types';
 
@@ -27,20 +27,73 @@ export default function VoiceAssistant({
   const [isListening, setIsListening] = useState(false);
   const [transcript, setTranscript] = useState('');
   const [parsedCommand, setParsedCommand] = useState<string | null>(null);
+  const [voiceAiResponse, setVoiceAiResponse] = useState<string | null>(null);
+  const [isConsulting, setIsConsulting] = useState(false);
+  const [isMuted, setIsMuted] = useState(false);
+  const [isSpeaking, setIsSpeaking] = useState(false);
   const [supported, setSupported] = useState(true);
+  
   const recognitionRef = useRef<any>(null);
+  const utteranceRef = useRef<SpeechSynthesisUtterance | null>(null);
+  const speakTextRef = useRef<(text: string) => void>(() => {});
 
   // Suggested preset commands that users can click to simulate speaking
   const simulatedCommands = [
     { text: "Switch to Banker Dashboard", display: { en: "Switch to Banker Dashboard", hi: "बैंकर्स डैशबोर्ड खोलें", hinglish: "Banker Dashboard open karo" } },
     { text: "Set loan to 5 Lakhs", display: { en: "Set loan to 5 Lakhs", hi: "लोन की राशि ५ लाख करो", hinglish: "Loan amount 5 Lakhs karo" } },
     { text: "Boost digital ratio to 90 percent", display: { en: "Boost digital to 90%", hi: "डिजिटल यूपीआई लेन-देन ९०% करो", hinglish: "UPI digital payment 90 percent karo" } },
-    { text: "Change language to Hindi", display: { en: "Change language to Hindi", hi: "भाषा हिंदी करो", hinglish: "Language isse Hindi karo" } },
-    { text: "Calculate alternative credit score", display: { en: "Calculate score", hi: "नया क्रेडिट स्कोर कैलकुलेट करो", hinglish: "AI credit score calculate karo" } }
+    { text: "How can I bypass traditional land security and collateral?", display: { en: "How to avoid collateral?", hi: "बिना गारंटी लोन कैसे मिलेगा?", hinglish: "Bina collateral loan kaise milega?" } },
+    { text: "Tell me about interest subsidies under PM Vishwakarma scheme.", display: { en: "About PM Vishwakarma?", hi: "पीएम विश्वकर्मा योजना क्या है?", hinglish: "PM Vishwakarma ke kya benefits hain?" } }
   ];
 
+  // Set up Speech Synthesis reference
   useEffect(() => {
-    // Check Speech Recognition support
+    speakTextRef.current = (text: string) => {
+      if (!('speechSynthesis' in window)) return;
+      
+      // Cancel any ongoing speaking
+      window.speechSynthesis.cancel();
+      
+      if (!isMuted) {
+        // Strip markdown elements for clear vocalization
+        const voiceText = text
+          .replace(/\*\*/g, '')
+          .replace(/__/g, '')
+          .replace(/#/g, '')
+          .replace(/-/g, '')
+          .trim();
+        
+        const utterance = new SpeechSynthesisUtterance(voiceText);
+        const voices = window.speechSynthesis.getVoices();
+        
+        // Find best match matching the current theme/language accent context
+        let matchedVoice = null;
+        if (language === 'hi' || language === 'hinglish') {
+          matchedVoice = voices.find(v => v.lang.startsWith('hi') || v.lang.includes('IN'));
+        } else {
+          matchedVoice = voices.find(v => v.lang.startsWith('en') && (v.lang.includes('IN') || v.lang.includes('US') || v.lang.includes('GB')));
+        }
+        
+        if (matchedVoice) {
+          utterance.voice = matchedVoice;
+        }
+        
+        utterance.lang = language === 'hi' ? 'hi-IN' : language === 'hinglish' ? 'hi-IN' : 'en-IN';
+        utterance.rate = 1.05; // Slightly swifter for dynamic flow
+        utterance.pitch = 1.0;
+        
+        utterance.onstart = () => setIsSpeaking(true);
+        utterance.onend = () => setIsSpeaking(false);
+        utterance.onerror = () => setIsSpeaking(false);
+        
+        utteranceRef.current = utterance;
+        window.speechSynthesis.speak(utterance);
+      }
+    };
+  }, [language, isMuted]);
+
+  // Handle Speech Recognition setup
+  useEffect(() => {
     const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
     if (!SpeechRecognition) {
       setSupported(false);
@@ -52,13 +105,19 @@ export default function VoiceAssistant({
     rec.interimResults = false;
     rec.maxAlternatives = 1;
 
-    // Dynamically adjust speech locale based on language state
+    // Adjust speech locale
     rec.lang = language === 'hi' ? 'hi-IN' : language === 'hinglish' ? 'hi-IN' : 'en-IN';
 
     rec.onstart = () => {
       setIsListening(true);
       setTranscript('');
       setParsedCommand(null);
+      setVoiceAiResponse(null);
+      
+      // Stop ongoing voice syntheses
+      if ('speechSynthesis' in window) {
+        window.speechSynthesis.cancel();
+      }
     };
 
     rec.onresult = (event: any) => {
@@ -86,6 +145,7 @@ export default function VoiceAssistant({
       try {
         setTranscript('');
         setParsedCommand(null);
+        setVoiceAiResponse(null);
         recognitionRef.current?.start();
       } catch (err) {
         console.error("Speech Recognition failed to start:", err);
@@ -93,8 +153,15 @@ export default function VoiceAssistant({
     }
   };
 
+  const stopSpeaking = () => {
+    if ('speechSynthesis' in window) {
+      window.speechSynthesis.cancel();
+      setIsSpeaking(false);
+    }
+  };
+
   // Match voiced intention coordinates and apply states directly to the live App state!
-  const processVoiceCommand = (commandText: string) => {
+  const processVoiceCommand = async (commandText: string) => {
     const text = commandText.toLowerCase().trim();
     let interpretation = "";
 
@@ -195,14 +262,54 @@ export default function VoiceAssistant({
         : `Updated transaction cash ratio parameter to ${(cashRatio * 100).toFixed(0)}% Cash / ${((1 - cashRatio) * 100).toFixed(0)}% Digital.`;
     }
 
-    // Default interpretation if no matches are hit
+    // Default: Send to Gemini Counselor backend to act as full-functioning counselor!!
     if (!interpretation) {
-      interpretation = language === 'hi' 
-        ? `निर्देश समझा गया: "${commandText}"। कृपया इसे सही प्रपत्र में कहें।` 
-        : `Parsed transcription: "${commandText}". Try commands like 'Set loan to 3 Lakh' or 'Switch to Banker'.`;
+      setIsConsulting(true);
+      setParsedCommand(null);
+      setVoiceAiResponse(null);
+      
+      try {
+        const response = await fetch('/api/ai-counsel', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ 
+            profile: selectedArtisan || {
+              name: "Lucknow Craft MSME",
+              craftType: "Chikankari shadow embroidery",
+              location: "Chowk, Lucknow",
+              artisanCount: 5,
+              transactionCashRatio: 0.40,
+              rawMaterialCostIncreaseBuffer: 0.15,
+              monthlyRent: 4000,
+              loanRequirement: 300000,
+              loanPurpose: "Expand Workshop"
+            }, 
+            userMessage: commandText, 
+            language 
+          })
+        });
+        const data = await response.json();
+        if (data.reply) {
+          setVoiceAiResponse(data.reply);
+          // Play out loud immediately unless muted!
+          speakTextRef.current(data.reply);
+        }
+      } catch (err) {
+        console.error("Voice command AI counselor session failed:", err);
+        const failMessage = language === 'hi' 
+          ? "सर्वर सिंक करने में कठिनाई हो रही है, कृपया दोबारा प्रयास करें।" 
+          : "Synch streaming timed out. Please retry speaking.";
+        setVoiceAiResponse(failMessage);
+        speakTextRef.current(failMessage);
+      } finally {
+        setIsConsulting(false);
+      }
+    } else {
+      setParsedCommand(interpretation);
+      setVoiceAiResponse(null);
+      // Play system command success out loud
+      speakTextRef.current(interpretation);
     }
-
-    setParsedCommand(interpretation);
   };
 
   // Simulate speaking when pre-recorded button is clicked (Guarantee 100% testability across iframe sandboxes)
@@ -215,6 +322,8 @@ export default function VoiceAssistant({
     }, 850);
   };
 
+  const t = translations[language] || translations.en;
+
   return (
     <div className="bg-white border border-stone-200 rounded-2xl p-5 shadow-sm space-y-4">
       
@@ -225,20 +334,47 @@ export default function VoiceAssistant({
             <Volume2 className="w-4 h-4 text-indigo-600 animate-pulse" />
           </div>
           <div>
-            <h4 className="font-display font-semibold text-stone-900 text-sm flex items-center gap-1">
-              {language === 'hi' ? translations.hi.voiceTitle : language === 'hinglish' ? translations.hinglish.voiceTitle : translations.en.voiceTitle}
-              <span className="text-[8px] tracking-wide font-mono uppercase bg-indigo-100 text-indigo-805 border border-indigo-200/60 px-1.5 py-0.2 rounded">Beta</span>
+            <h4 className="font-display font-semibold text-stone-900 text-sm flex items-center gap-1.5">
+              {t.voiceTitle}
+              <span className="text-[8px] tracking-wide font-mono uppercase bg-emerald-50 text-emerald-700 border border-emerald-200/60 px-1.5 py-0.5 rounded font-extrabold animate-pulse">
+                Conversational AI
+              </span>
             </h4>
             <p className="text-[10px] text-stone-400 mt-0.5">
-              {language === 'hi' ? translations.hi.voiceLanguageHint : language === 'hinglish' ? translations.hinglish.voiceLanguageHint : translations.en.voiceLanguageHint}
+              {t.voiceLanguageHint}
             </p>
           </div>
         </div>
 
-        {/* Dynamic status indicator */}
-        <div className="flex items-center gap-1.5">
-          <span className={`h-2 w-2 rounded-full ${isListening ? 'bg-red-500 animate-ping' : 'bg-stone-300'}`}></span>
-          <span className="text-[9px] font-mono text-stone-400">{isListening ? 'LIVE' : 'IDLE'}</span>
+        {/* Controls and Speaker Status Indicators */}
+        <div className="flex items-center gap-2">
+          {isSpeaking && (
+            <button 
+              onClick={stopSpeaking}
+              className="px-2 py-0.5 text-[8px] font-mono text-red-600 bg-red-50 hover:bg-red-100 rounded border border-red-200 transition cursor-pointer"
+            >
+              Stop Speaking
+            </button>
+          )}
+          <button
+            onClick={() => {
+              const nextMute = !isMuted;
+              setIsMuted(nextMute);
+              if (nextMute) stopSpeaking();
+            }}
+            className={`p-1.5 rounded-lg border transition duration-200 cursor-pointer ${
+              isMuted 
+                ? 'bg-rose-50 border-rose-200 text-rose-600 hover:bg-rose-100' 
+                : 'bg-stone-50 border-stone-200 text-stone-500 hover:text-indigo-600 hover:bg-stone-100'
+            }`}
+            title={isMuted ? "Unmute Voice responses" : "Mute Voice responses"}
+          >
+            {isMuted ? <VolumeX className="w-3.5 h-3.5" /> : <Volume2 className="w-3.5 h-3.5" />}
+          </button>
+          <div className="flex items-center gap-1 bg-stone-50 border border-stone-200/50 px-2 py-1 rounded-md">
+            <span className={`h-1.5 w-1.5 rounded-full ${isListening ? 'bg-red-500 animate-ping' : isSpeaking ? 'bg-emerald-500 animate-pulse' : 'bg-stone-300'}`}></span>
+            <span className="text-[8px] font-mono text-stone-400 uppercase tracking-widest">{isListening ? 'Listening' : isSpeaking ? 'Speaking' : 'Idle'}</span>
+          </div>
         </div>
       </div>
 
@@ -257,9 +393,9 @@ export default function VoiceAssistant({
         >
           {isListening ? (
             <div className="relative">
-              <Mic className="w-6 h-6 animate-bounce" />
+              <Mic className="w-6 h-6 animate-pulse" />
               {/* ripple vectors */}
-              <span className="absolute -inset-2.5 rounded-full border border-red-400/40 animate-ping"></span>
+              <span className="absolute -inset-2 rounded-full border border-red-400/30 animate-ping"></span>
             </div>
           ) : (
             <Mic className="w-6 h-6" />
@@ -269,10 +405,7 @@ export default function VoiceAssistant({
         {/* Dynamic Voice transcription block */}
         <div className="flex-1 space-y-1 w-full text-center sm:text-left">
           <div className="text-xs font-semibold text-stone-701 font-sans">
-            {isListening 
-              ? (language === 'hi' ? translations.hi.voiceMicEnabled : language === 'hinglish' ? translations.hinglish.voiceMicEnabled : translations.en.voiceMicEnabled)
-              : (language === 'hi' ? translations.hi.voiceMicDisabled : language === 'hinglish' ? translations.hinglish.voiceMicDisabled : translations.en.voiceMicDisabled)
-            }
+            {isListening ? t.voiceMicEnabled : t.voiceMicDisabled}
           </div>
 
           <div className="text-[11px] text-stone-600 italic leading-relaxed min-h-6 flex items-center justify-center sm:justify-start">
@@ -282,17 +415,49 @@ export default function VoiceAssistant({
               </span>
             ) : (
               <span className="text-stone-400 font-sans">
-                {language === 'hi' ? translations.hi.voicePromptExample : language === 'hinglish' ? translations.hinglish.voicePromptExample : translations.en.voicePromptExample}
+                {t.voicePromptExample}
               </span>
             )}
           </div>
         </div>
       </div>
 
+      {/* Loading Spinner for AI Counselor Call */}
+      {isConsulting && (
+        <div className="bg-indigo-50/40 border border-indigo-100/80 p-4 rounded-xl flex items-center justify-center gap-2.5 font-sans animate-pulse">
+          <RefreshCw className="w-4 h-4 text-indigo-500 animate-spin" />
+          <span className="text-xs text-indigo-900 font-medium font-mono">
+            {language === 'hi' ? 'जेमिनी एआई सलाहकार आपके प्रश्न का उत्तर तैयार कर रहा है...' : 'Gemini AI Counselor is preparing audio answer...'}
+          </span>
+        </div>
+      )}
+
+      {/* Display freeform Gemini Underwriting advice response */}
+      {voiceAiResponse && !isConsulting && (
+        <div className="bg-indigo-50/50 border border-indigo-100 rounded-xl p-4.5 space-y-2 animate-fade-in shadow-inner">
+          <div className="flex items-center gap-1.5 pb-1.5 border-b border-indigo-100/50">
+            <span className="p-1 rounded bg-indigo-100 text-indigo-600">
+              <MessageSquare className="w-3.5 h-3.5" />
+            </span>
+            <span className="text-[10px] font-mono font-bold text-indigo-800 uppercase tracking-wider">
+              {language === 'hi' ? translations.hi.counselorTitle : translations.en.counselorTitle}
+            </span>
+          </div>
+          <div className="text-xs text-stone-800 leading-relaxed font-sans max-h-48 overflow-y-auto select-text font-medium whitespace-pre-line">
+            {voiceAiResponse}
+          </div>
+          {isMuted && (
+            <div className="text-[9px] text-rose-500 italic font-mono flex items-center gap-1 mt-1 pt-1 border-t border-indigo-100/30">
+              <span>● Sound is muted. To hear response, click the volume icon on top.</span>
+            </div>
+          )}
+        </div>
+      )}
+
       {/* Structured Interpretations Logger feedback */}
-      {parsedCommand && (
-        <div className="bg-emerald-50 border border-emerald-250 p-3 rounded-xl flex gap-2.5 items-start animate-fade-in font-sans">
-          <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
+      {parsedCommand && !isConsulting && (
+        <div className="bg-emerald-50 border border-emerald-200 p-3 rounded-xl flex gap-2.5 items-start animate-fade-in font-sans">
+          <CheckCircle2 className="w-4 h-4 text-emerald-650 shrink-0 mt-0.5" />
           <div>
             <span className="text-[9px] font-mono font-extrabold uppercase text-emerald-800 tracking-wider">Command Decoded</span>
             <p className="text-xs font-semibold text-emerald-950 leading-relaxed mt-0.5">{parsedCommand}</p>
@@ -303,7 +468,7 @@ export default function VoiceAssistant({
       {/* Simulated voice assistant prompts - Guarantee 100% interactive sandbox success */}
       <div className="space-y-2 pt-2 border-t border-stone-150">
         <span className="text-[9px] font-mono uppercase tracking-widest font-extrabold text-stone-400 block mb-2.5">
-          {language === 'hi' ? translations.hi.voiceSimulatedBtn : language === 'hinglish' ? translations.hinglish.voiceSimulatedBtn : translations.en.voiceSimulatedBtn}
+          {t.voiceSimulatedBtn}
         </span>
         
         <div className="flex flex-wrap gap-2 justify-start">
@@ -313,7 +478,7 @@ export default function VoiceAssistant({
               onClick={() => handleSimulatedClick(cmd.text)}
               className="text-[10px] text-stone-700 bg-stone-50 border border-stone-200 hover:border-indigo-300 hover:bg-indigo-50/20 px-2.5 py-1.5 rounded-lg transition duration-200 text-left flex items-center gap-1 cursor-pointer font-sans"
             >
-              <CornerDownRight className="w-2.5 h-2.5 text-stone-400 shrink-0" />
+              <CornerDownRight className="w-2.5 h-2.5 text-stone-405 shrink-0" />
               <span>{language === 'hi' ? cmd.display.hi : language === 'hinglish' ? cmd.display.hinglish : cmd.display.en}</span>
             </button>
           ))}

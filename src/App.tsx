@@ -11,6 +11,7 @@ import MSMEForm from './components/MSMEForm';
 import ArtisanDetail from './components/ArtisanDetail';
 import AIStressTester from './components/AIStressTester';
 import AICopilot from './components/AICopilot';
+import SwarozgarPassbook from './components/SwarozgarPassbook';
 import { Language, translations } from './utils/translations';
 import VoiceAssistant from './components/VoiceAssistant';
 
@@ -405,7 +406,7 @@ export default function App() {
   const t = translations[language];
 
   return (
-    <div id="app_root" className="min-h-screen bg-[#FAF9F6] text-stone-800 flex flex-col antialiased">
+    <div id="app_root" className="min-h-screen bg-[#F7F6F1] text-stone-800 flex flex-col antialiased">
       
       {/* Prime Header Branding */}
       <header className="bg-white border-b border-stone-200 sticky top-0 z-50 px-4 lg:px-8 py-4 shadow-xs">
@@ -689,6 +690,15 @@ export default function App() {
                   reason={scoringResult?.scoring.assessmentReason || 'Configure MSME Operational details on the left and tap Calculate to compute verified alternate risks.'} 
                   language={language}
                 />
+
+                {/* Swarozgar Dynamic Digital Passbook & Credit Certificate */}
+                {selectedArtisan && scoringResult && (
+                  <SwarozgarPassbook 
+                    profile={selectedArtisan} 
+                    scoring={scoringResult.scoring} 
+                    language={language}
+                  />
+                )}
 
                 {/* Dynamic recommendation score card */}
                 {scoringResult && (

@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { Sparkles, ArrowRight, Lightbulb, Compass, MessagesSquare, Send, CheckCircle, RefreshCw } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Sparkles, ArrowRight, Lightbulb, Compass, MessagesSquare, Send, CheckCircle, RefreshCw, Volume2, VolumeX } from 'lucide-react';
 import { MSMEProfile } from '../types';
 import { Language, translations } from '../utils/translations';
 
@@ -17,6 +17,57 @@ export default function AICopilot({ profile, currentScore, language }: AICopilot
   const [userQuery, setUserQuery] = useState<string>('');
   const [chatReply, setChatReply] = useState<string>('');
   const [isConsulting, setIsConsulting] = useState<boolean>(false);
+  const [isSpeaking, setIsSpeaking] = useState<boolean>(false);
+
+  useEffect(() => {
+    return () => {
+      if ('speechSynthesis' in window) {
+        window.speechSynthesis.cancel();
+      }
+    };
+  }, []);
+
+  const speakResponse = (text: string) => {
+    if (!('speechSynthesis' in window)) return;
+    
+    if (isSpeaking) {
+      window.speechSynthesis.cancel();
+      setIsSpeaking(false);
+      return;
+    }
+    
+    window.speechSynthesis.cancel();
+    
+    const voiceText = text
+      .replace(/\*\*/g, '')
+      .replace(/__/g, '')
+      .replace(/#/g, '')
+      .replace(/-/g, '')
+      .trim();
+
+    const utterance = new SpeechSynthesisUtterance(voiceText);
+    const voices = window.speechSynthesis.getVoices();
+    let targetVoice = null;
+    
+    if (language === 'hi' || language === 'hinglish') {
+      targetVoice = voices.find(v => v.lang.startsWith('hi') || v.lang.includes('IN'));
+    } else {
+      targetVoice = voices.find(v => v.lang.startsWith('en') && (v.lang.includes('IN') || v.lang.includes('US') || v.lang.includes('GB')));
+    }
+    
+    if (targetVoice) {
+      utterance.voice = targetVoice;
+    }
+    
+    utterance.lang = language === 'hi' ? 'hi-IN' : language === 'hinglish' ? 'hi-IN' : 'en-IN';
+    utterance.rate = 1.05;
+    
+    utterance.onstart = () => setIsSpeaking(true);
+    utterance.onend = () => setIsSpeaking(false);
+    utterance.onerror = () => setIsSpeaking(false);
+    
+    window.speechSynthesis.speak(utterance);
+  };
 
   // Translate Sugestion chips depending on locale
   const quickQuestionsMap = {
@@ -290,19 +341,36 @@ export default function AICopilot({ profile, currentScore, language }: AICopilot
 
         {/* AI Answer window */}
         {(chatReply || isConsulting) && (
-          <div className="bg-white rounded-xl p-3.5 border border-stone-200/80 mb-4 max-h-56 overflow-y-auto select-text shadow-inner">
+          <div className="bg-white rounded-xl p-3.5 border border-stone-200/80 mb-4 max-h-56 overflow-y-auto select-text shadow-inner relative">
             {isConsulting ? (
               <div className="flex items-center gap-2 justify-center py-4 font-mono">
                 <RefreshCw className="w-4 h-4 text-indigo-500 animate-spin" />
                 <span className="text-[11px] text-stone-400 animate-pulse">{language === 'hi' ? 'सुरक्षित सलाहकार नियमों को खोजा जा रहा है...' : 'Consulting historical registers...'}</span>
               </div>
             ) : (
-              <div className="text-[11px] text-stone-700 leading-normal font-sans prose prose-neutral">
-                {chatReply.split('\n\n').map((para, i) => (
-                  <p key={i} className="mb-2 last:mb-0">
-                    {para}
-                  </p>
-                ))}
+              <div className="space-y-2">
+                <div className="flex justify-between items-start gap-4">
+                  <div className="text-[11px] text-stone-700 leading-normal font-sans prose prose-neutral flex-1">
+                    {chatReply.split('\n\n').map((para, i) => (
+                      <p key={i} className="mb-2 last:mb-0">
+                        {para}
+                      </p>
+                    ))}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => speakResponse(chatReply)}
+                    className={`p-1.5 rounded-lg border transition duration-200 cursor-pointer text-xs flex items-center gap-1 shrink-0 ${
+                      isSpeaking 
+                        ? 'bg-rose-50 border-rose-200 text-rose-650 hover:bg-rose-100' 
+                        : 'bg-stone-50 border-stone-200 text-stone-650 hover:bg-stone-100 hover:text-indigo-650'
+                    }`}
+                    title={isSpeaking ? "Mute Answer" : "Listen to advice"}
+                  >
+                    {isSpeaking ? <VolumeX className="w-3.5 h-3.5" /> : <Volume2 className="w-3.5 h-3.5" />}
+                    <span className="text-[9px] font-mono leading-none">{isSpeaking ? 'Mute' : 'Listen'}</span>
+                  </button>
+                </div>
               </div>
             )}
           </div>

@@ -5,12 +5,74 @@
   --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
   --font-display: "Space Grotesk", sans-serif;
   --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
+
+  /* Redefining Indigo as Royal Silk Emerald Green (#0A5F3E) for high-end professional credit */
+  --color-indigo-50: #f0fbf6;
+  --color-indigo-100: #daf6e8;
+  --color-indigo-150: #bbf0d2;
+  --color-indigo-200: #86e4ae;
+  --color-indigo-500: #0f935f;
+  --color-indigo-605: #0a7e50;
+  --color-indigo-600: #0a5f3e; /* Royal Jade Emerald */
+  --color-indigo-700: #07472e;
+  --color-indigo-750: #053b26;
+  --color-indigo-800: #04321e;
+  --color-indigo-805: #032a19;
+  --color-indigo-850: #021f12;
+  --color-indigo-900: #01110a;
+
+  /* Redefining Slate as Sophisticated Warm Graphite for noble layout markers */
+  --color-slate-50: #fafaf9;
+  --color-slate-100: #f4f3f0;
+  --color-slate-200: #e6e5e0;
+  --color-slate-500: #78746c;
+  --color-slate-600: #57544e;
+  --color-slate-705: #403e38;
+  --color-slate-700: #3c3a34;
+  --color-slate-800: #292824;
+  --color-slate-850: #1b1a17;
+
+  /* Elevating default Stone to Cashmere Ivory Linen for a stunning handcrafted surface look */
+  --color-stone-50: #fdfdfb;
+  --color-stone-100: #f7f6f0;
+  --color-stone-105: #f2f0e8;
+  --color-stone-150: #e8e5d9;
+  --color-stone-200: #dddac6;
+  --color-stone-250: #cdc8af;
+  --color-stone-300: #b5af96;
+  --color-stone-400: #8a8264;
+  --color-stone-450: #746d52;
+  --color-stone-500: #625c44;
+  --color-stone-600: #4a4533;
+  --color-stone-605: #3c3829;
+  --color-stone-700: #383426;
+  --color-stone-750: #29261c;
+  --color-stone-755: #1f1d15;
+  --color-stone-800: #1c1a14;
+  --color-stone-850: #14120e;
+  --color-stone-900: #0d0c09;
+
+  /* Redefining Amber as Heritage Brushed Gold to evoke Zardozi and elite master craftsmanship */
+  --color-amber-50: #fffcf0;
+  --color-amber-100: #fef0c7;
+  --color-amber-200: #fde08a;
+  --color-amber-500: #c29d38; /* Luxury Satin Gold */
+  --color-amber-600: #ab862c;
+  --color-amber-805: #7d601a;
+  --color-amber-850: #5c4510;
 }
 
 body {
   font-family: var(--font-sans);
-  background-color: #FAF9F6; /* Soft premium Chikankari off-white canvas */
-  color: #1c1917; /* Noble deep stone charcoal */
+  background-color: #F7F6F1; /* Heritage Cashmere Linen Backdrop */
+  background-image: 
+    radial-gradient(#cbc4b3 0.5px, transparent 0.5px), 
+    radial-gradient(#cbc4b3 0.5px, #f7f6f1 0.5px);
+  background-size: 20px 20px;
+  background-position: 0 0, 10px 10px;
+  background-attachment: fixed;
+  color: #1A1815; /* Charcoal Obsidian text */
+  -webkit-font-smoothing: antialiased;
 }
 
 .font-display {
@@ -19,6 +81,21 @@ body {
 
 .font-mono {
   font-family: var(--font-mono);
+}
+
+/* Premium premium container designs */
+.premium-card-border {
+  border: 1px solid #e1ded0;
+  box-shadow: 0 4px 20px -2px rgba(13, 92, 58, 0.02), 0 2px 6px -1px rgba(12, 95, 62, 0.01);
+}
+
+.premium-card-hover {
+  transition: all 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.premium-card-hover:hover {
+  transform: translateY(-2px);
+  border-color: #c29d38;
+  box-shadow: 0 12px 30px -4px rgba(10, 95, 62, 0.05), 0 4px 12px -2px rgba(194, 157, 56, 0.03);
 }
 
 /* Premium micro-interactions & utility classes */
@@ -72,14 +149,14 @@ body {
 }
 
 ::-webkit-scrollbar-track {
-  background: #faf9f6;
+  background: #f7f6f1;
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #e7e5e4;
+  background: #dddac6;
   border-radius: 4px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #d6d3d1;
+  background: #b5af96;
 }
